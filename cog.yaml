@@ -1,0 +1,11 @@
+build:
+  gpu: false
+  cuda: "12.1"
+  python_version: "3.11"
+  system_packages:
+    - "ffmpeg"
+    - "wget"
+  python_packages:
+    - "requests==2.32.3"
+
+predict: "predict.py:Predictor"
