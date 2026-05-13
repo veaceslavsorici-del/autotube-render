@@ -29,7 +29,7 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        audio_url: Optional[str] = Input(description="MP3/WAV URL for the voiceover (optional). Sets total duration.", default=None),
+        audio_url: str = Input(description="MP3/WAV URL for the voiceover (optional). Sets total duration.", default=None),
         image_urls: List[str] = Input(description="List of image URLs to use as slideshow frames"),
         resolution: str = Input(description="Output resolution WxH", default="1920x1080",
                                 choices=["1920x1080", "1280x720", "854x480"]),
