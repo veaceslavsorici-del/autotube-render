@@ -5,6 +5,11 @@ build:
   system_packages:
     - "ffmpeg"
     - "wget"
+    # Fonts for libass — the subtitles filter renders nothing without an installed
+    # font. fontconfig substitutes any requested family to one of these.
+    - "fontconfig"
+    - "fonts-liberation"
+    - "fonts-dejavu-core"
   python_packages:
     - "requests==2.32.3"
 
