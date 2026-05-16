@@ -2,8 +2,10 @@
 Replicate Cog model: slideshow render from audio + images.
 
 Input:
-    audio_url:   MP3/WAV URL (optional). If set, video duration = audio length.
-    image_urls:  list of PNG/JPG URLs (required, 1-300 images).
+    audio_url:      MP3/WAV URL (optional). If set, video duration = audio length.
+    image_urls:     list of PNG/JPG URLs (required, 1-300 images).
+    subtitles_url:  ASS subtitle file URL (optional). Burned in with libass —
+                    supports karaoke (\\k) highlighting.
     resolution:  "1920x1080" | "1280x720" | "854x480"  (default 1920x1080)
     fps:         int  (default 30)
     transition:  "none" | "fade"  (default "none")
@@ -31,6 +33,7 @@ class Predictor(BasePredictor):
         self,
         audio_url: str = Input(description="MP3/WAV URL for the voiceover (optional). Sets total duration.", default=None),
         image_urls: List[str] = Input(description="List of image URLs to use as slideshow frames"),
+        subtitles_url: str = Input(description="ASS subtitle file URL to burn in with libass (karaoke \\k tags supported). Optional.", default=None),
         resolution: str = Input(description="Output resolution WxH", default="1920x1080",
                                 choices=["1920x1080", "1280x720", "854x480"]),
         fps: int = Input(description="Output FPS", default=30, ge=24, le=60),
@@ -64,6 +67,15 @@ class Predictor(BasePredictor):
                 self._download(url, local)
                 local_images.append(local)
             print(f"Downloaded {len(local_images)} images")
+
+            # 2b. Download ASS subtitles (optional). Burned in via the libass-backed
+            # `subtitles` filter — server ffmpeg (apt) ships with libass, unlike the
+            # browser ffmpeg.wasm core.
+            subs_name = None
+            if subtitles_url:
+                self._download(subtitles_url, os.path.join(workdir, "subs.ass"))
+                subs_name = "subs.ass"
+                print("Subtitles downloaded")
 
             # 3. Compute per-image duration
             n = len(local_images)
@@ -118,14 +130,20 @@ class Predictor(BasePredictor):
             args += ["-f", "concat", "-safe", "0", "-i", list_path]
             if audio_path:
                 args += ["-i", audio_path]
-            args += ["-vf", scale_filter]
+            # Subtitles are burned in by appending the libass `subtitles` filter.
+            # subs.ass is referenced by bare name (ffmpeg runs with cwd=workdir) to
+            # sidestep filter-graph path escaping.
+            vf = scale_filter
+            if subs_name:
+                vf += f",subtitles={subs_name}"
+            args += ["-vf", vf]
             args += ["-c:v", vcodec, "-preset", vpreset, "-r", str(fps), "-pix_fmt", "yuv420p"]
             if audio_path:
                 args += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
             args += [out_path]
             print("FFmpeg args:", " ".join(args))
 
-            proc = subprocess.run(args, capture_output=True, text=True)
+            proc = subprocess.run(args, capture_output=True, text=True, cwd=workdir)
             if proc.returncode != 0:
                 print("FFmpeg stderr:", proc.stderr[-4000:])
                 raise RuntimeError(f"FFmpeg failed (rc={proc.returncode})")
